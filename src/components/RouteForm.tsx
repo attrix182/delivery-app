@@ -2,8 +2,10 @@ interface RouteFormProps {
   depot: string;
   stops: string;
   isLoading: boolean;
+  returnToDepot: boolean;
   onDepotChange: (value: string) => void;
   onStopsChange: (value: string) => void;
+  onReturnToDepotChange: (value: boolean) => void;
   onOptimize: () => void;
 }
 
@@ -11,8 +13,10 @@ export default function RouteForm({
   depot, 
   stops, 
   isLoading, 
+  returnToDepot,
   onDepotChange, 
   onStopsChange, 
+  onReturnToDepotChange,
   onOptimize 
 }: RouteFormProps) {
   return (
@@ -29,6 +33,22 @@ export default function RouteForm({
           placeholder="Ej: Av. Corrientes 1234, CABA"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
         />
+        
+        {/* Checkbox para regresar al depósito */}
+        {depot.trim() && (
+          <div className="mt-3 flex items-center">
+            <input
+              type="checkbox"
+              id="returnToDepot"
+              checked={returnToDepot}
+              onChange={(e) => onReturnToDepotChange(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="returnToDepot" className="ml-2 text-sm text-gray-700">
+              🔄 Finalizar recorrido regresando al depósito
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Direcciones */}

@@ -6,18 +6,19 @@ import MapView from './MapView';
 import ResizableSidebar from './ResizableSidebar';
 import RouteForm from './RouteForm';
 import RouteResults from './RouteResults';
-import InfoPanel from './InfoPanel';
+
 import { useRouteOptimization } from '@/hooks/useRouteOptimization';
 
 export default function DeliveryOptimizer() {
   const [depot, setDepot] = useState('');
   const [stops, setStops] = useState('');
+  const [returnToDepot, setReturnToDepot] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const { status, result, isLoading, optimize, setMapInstances, setResult, renderOnMap } = useRouteOptimization();
 
   const handleOptimize = () => {
-    optimize(depot, stops);
+    optimize(depot, stops, returnToDepot);
   };
 
   const handleMapReady = (map: google.maps.Map, directionsRenderer: google.maps.DirectionsRenderer) => {
@@ -60,8 +61,10 @@ export default function DeliveryOptimizer() {
               depot={depot}
               stops={stops}
               isLoading={isLoading}
+              returnToDepot={returnToDepot}
               onDepotChange={setDepot}
               onStopsChange={setStops}
+              onReturnToDepotChange={setReturnToDepot}
               onOptimize={handleOptimize}
             />
 
@@ -89,8 +92,7 @@ export default function DeliveryOptimizer() {
               />
             )}
 
-            {/* Panel informativo */}
-            <InfoPanel />
+
           </div>
         </ResizableSidebar>
 

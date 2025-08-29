@@ -64,21 +64,34 @@ Para obtener una API key de Google Maps:
 
 1. Ve a [Google Cloud Console](https://console.cloud.google.com/)
 2. Crea un nuevo proyecto o selecciona uno existente
-3. Habilita las siguientes APIs:
-   - Maps JavaScript API
-   - Geocoding API
-   - Distance Matrix API
-   - Directions API
+3. Habilita las siguientes APIs (nuevas APIs de Google Maps Platform):
+   - **Maps JavaScript API** (Essentials)
+   - **Geocoding API** (Essentials)
+   - **Compute Routes API** (Essentials) - reemplaza Directions API
+   - **Compute Routes Matrix API** (Essentials) - reemplaza Distance Matrix API
 4. Crea credenciales (API Key)
 5. Restringe la API key por dominio para mayor seguridad
+
+### APIs Migradas (Marzo 2025)
+- ✅ **Directions API** → **Compute Routes API** (Essentials)
+- ✅ **Distance Matrix API** → **Compute Routes Matrix API** (Essentials)
+- ✅ **Geocoding API** → **Geocoding API** (Essentials) - sin cambios
+
+### Free Tier
+- **10K llamadas gratuitas** por API por mes (Essentials)
+- **Sin crédito fijo** de $200 USD
+- **Descuentos automáticos** por volumen
 
 ## Tecnologías Utilizadas
 
 - **Next.js 14**: Framework de React
 - **TypeScript**: Tipado estático
 - **Tailwind CSS**: Framework de CSS
-- **Google Maps JavaScript API**: Mapas y geocodificación
-- **@googlemaps/js-api-loader**: Cargador de Google Maps
+- **Google Maps Platform** (nuevas APIs):
+  - **Maps JavaScript API** (Essentials): Mapas interactivos
+  - **Geocoding API** (Essentials): Conversión de direcciones a coordenadas
+  - **Compute Routes API** (Essentials): Cálculo de rutas optimizadas
+  - **Compute Routes Matrix API** (Essentials): Matriz de distancias y tiempos
 
 ## Estructura del Proyecto
 
@@ -103,9 +116,15 @@ src/
 
 ## Limitaciones
 
-- Google Maps limita las matrices de distancia a ~25 puntos por batch
-- Para más de 25 puntos se usa cálculo aproximado con fórmula de Haversine
-- Los waypoints en URLs de Google Maps están limitados a 23 por tramo
+- **Compute Routes Matrix API**: Limitada a ~25 puntos por batch para matrices de distancia
+- **Compute Routes API**: Máximo 23 waypoints por solicitud de ruta
+- **Fallback**: Para más de 25 puntos se usa cálculo aproximado con fórmula de Haversine
+- **Free Tier**: 10K llamadas gratuitas por API por mes (Essentials)
+
+### Optimizaciones Implementadas
+- ✅ **Controles deshabilitados**: `mapTypeControl`, `streetViewControl`, `fullscreenControl` para reducir costos
+- ✅ **Matriz optimizada**: Construcción fila por fila para minimizar llamadas
+- ✅ **Manejo de errores**: Fallback a Haversine para casos edge
 
 ## Contribuir
 

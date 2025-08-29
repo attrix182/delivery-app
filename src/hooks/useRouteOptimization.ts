@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Point, solveTSP, buildMatrixHaversine } from '@/utils/tsp-algorithms';
+import { Point, solveTSP, solveTSPOpen, buildMatrixHaversine, routeCost } from '@/utils/tsp-algorithms';
 import { geocodeAddress, buildMatrixGoogle, drawDirectionsInBatches } from '@/utils/google-maps';
 
 interface OptimizationResult {
@@ -59,7 +59,7 @@ export function useRouteOptimization() {
       return;
     }
 
-    const { order, points, matrix } = optimizationResult;
+    const { order, points } = optimizationResult;
     const bounds = new google.maps.LatLngBounds();
 
     // Limpiar marcadores anteriores
@@ -72,18 +72,35 @@ export function useRouteOptimization() {
     });
     markersRef.current = [];
 
-    // Crear marcadores
+    // Crear marcadores con manejo especial para depósito duplicado
+    const uniqueMarkers = new Set<string>(); // Para evitar marcadores duplicados
     order.forEach((pointIndex, k) => {
       try {
         const point = points[pointIndex];
-        const marker = new google.maps.Marker({
-          position: { lat: point.lat, lng: point.lng },
-          label: (k + 1).toString(),
-          map: mapInstanceRef.current
-        });
+        const markerKey = `${point.lat},${point.lng}`;
         
-        markersRef.current.push(marker);
-        bounds.extend(marker.getPosition()!);
+        // Si es el último punto y es igual al primero (depósito), usar etiqueta especial
+        let label = (k + 1).toString();
+        if (k === order.length - 1 && pointIndex === order[0]) {
+          label = '🏠'; // Icono de casa para el depósito final
+        }
+        
+        // Solo crear marcador si no existe uno en la misma posición
+        if (!uniqueMarkers.has(markerKey) || k === order.length - 1) {
+          const marker = new google.maps.Marker({
+            position: { lat: point.lat, lng: point.lng },
+            label: label,
+            map: mapInstanceRef.current
+          });
+          
+          markersRef.current.push(marker);
+          bounds.extend(marker.getPosition()!);
+          
+          // Solo agregar a uniqueMarkers si no es el último punto duplicado
+          if (k < order.length - 1) {
+            uniqueMarkers.add(markerKey);
+          }
+        }
       } catch (error) {
         console.warn('Error creating marker:', error);
       }
@@ -118,7 +135,7 @@ export function useRouteOptimization() {
     }
   };
 
-  const optimize = async (depot: string, stops: string) => {
+  const optimize = async (depot: string, stops: string, returnToDepot: boolean = true) => {
     try {
       setIsLoading(true);
       setStatus('Geocodificando...');
@@ -143,17 +160,32 @@ export function useRouteOptimization() {
         stopPoints.push(await geocodeAddress(line));
       }
 
-      setStatus('Construyendo matriz (Distance Matrix)...');
+      setStatus('Construyendo matriz de distancias...');
       
       const allPoints = depotPoint ? [depotPoint, ...stopPoints] : stopPoints;
       const n = allPoints.length;
 
       // Construir matriz de distancias
       let durationMatrix: number[][];
-      if (n <= 25) {
-        durationMatrix = await buildMatrixGoogle(allPoints);
-      } else {
+      try {
+        if (n <= 25) {
+          durationMatrix = await buildMatrixGoogle(allPoints);
+          // Verificar si la matriz tiene valores Infinity (error de API)
+          const hasInfinity = durationMatrix.some(row => row.some(val => val === Infinity));
+          if (hasInfinity) {
+            console.warn('API de Google falló, usando cálculo de Haversine');
+            setStatus('API de Google no disponible, usando cálculo aproximado...');
+            durationMatrix = buildMatrixHaversine(allPoints);
+            console.log('Matriz Haversine generada:', durationMatrix);
+          }
+        } else {
+          durationMatrix = buildMatrixHaversine(allPoints);
+        }
+      } catch (error) {
+        console.warn('Error con APIs de Google, usando cálculo de Haversine:', error);
+        setStatus('API de Google no disponible, usando cálculo aproximado...');
         durationMatrix = buildMatrixHaversine(allPoints);
+        console.log('Matriz Haversine generada (catch):', durationMatrix);
       }
 
       // Optimizar ruta
@@ -162,12 +194,24 @@ export function useRouteOptimization() {
       let optimizationResult: OptimizationResult;
 
       if (depotPoint) {
-        const subMatrix = durationMatrix.slice(1).map(row => row.slice(1));
-        orderLocal = solveTSP(subMatrix, 0);
-        const globalOrder = [0, ...orderLocal.map(i => i + 1)];
-        hasDepot = true;
-        optimizationResult = { order: globalOrder, points: allPoints, matrix: durationMatrix, hasDepot };
+        if (returnToDepot) {
+          // Caso 1: Con depósito y regresar al depósito (TSP clásico)
+          const subMatrix = durationMatrix.slice(1).map(row => row.slice(1));
+          orderLocal = solveTSP(subMatrix, 0);
+          const globalOrder = [0, ...orderLocal.map(i => i + 1), 0]; // Agregar depósito al final
+          hasDepot = true;
+          optimizationResult = { order: globalOrder, points: allPoints, matrix: durationMatrix, hasDepot };
+        } else {
+          // Caso 2: Con depósito pero NO regresar al depósito (TSP abierto)
+          const subMatrix = durationMatrix.slice(1).map(row => row.slice(1));
+          // Usar algoritmo que no regrese al inicio
+          orderLocal = solveTSPOpen(subMatrix, 0);
+          const globalOrder = [0, ...orderLocal.map(i => i + 1)]; // Sin agregar depósito al final
+          hasDepot = true;
+          optimizationResult = { order: globalOrder, points: allPoints, matrix: durationMatrix, hasDepot };
+        }
       } else {
+        // Caso 3: Sin depósito
         orderLocal = solveTSP(durationMatrix, 0);
         hasDepot = false;
         optimizationResult = { order: orderLocal, points: allPoints, matrix: durationMatrix, hasDepot };
@@ -175,6 +219,21 @@ export function useRouteOptimization() {
 
       setResult(optimizationResult);
       renderOnMap(optimizationResult);
+      
+      // Log del tiempo total calculado
+      let totalTime: number;
+      if (depotPoint && returnToDepot) {
+        // Incluir tiempo de regreso al depósito (ya está incluido en el order)
+        totalTime = routeCost(optimizationResult.order, durationMatrix);
+      } else {
+        // NO incluir tiempo de regreso al depósito
+        totalTime = routeCost(optimizationResult.order, durationMatrix);
+      }
+      console.log('Tiempo total calculado:', totalTime, 'segundos');
+      console.log('Tiempo total en minutos:', Math.round(totalTime / 60), 'minutos');
+      console.log('Regresar al depósito:', returnToDepot);
+      console.log('Orden de la ruta:', optimizationResult.order);
+      console.log('Puntos en la ruta:', optimizationResult.order.map(i => optimizationResult.points[i].label || `${optimizationResult.points[i].lat}, ${optimizationResult.points[i].lng}`));
       
       setStatus('Listo ✅');
     } catch (error) {

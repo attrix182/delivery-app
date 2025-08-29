@@ -221,7 +221,7 @@ export function geneticAlgorithm(
       
       // Mutación
       if (Math.random() < 0.1) {
-        mutate(child, start);
+        mutate(child);
       }
       
       newPopulation.push(child);
@@ -284,11 +284,54 @@ function crossover(parent1: number[], parent2: number[], start: number): number[
   return child;
 }
 
-function mutate(tour: number[], start: number): void {
+function mutate(tour: number[]): void {
   // Swap mutation
   const i = 1 + Math.floor(Math.random() * (tour.length - 2));
   const j = 1 + Math.floor(Math.random() * (tour.length - 2));
   [tour[i], tour[j]] = [tour[j], tour[i]];
+}
+
+// TSP abierto: no regresa al punto de inicio
+export function solveTSPOpen(matrix: number[][], start: number = 0): number[] {
+  const n = matrix.length;
+  
+  // Para problemas pequeños (n ≤ 8), usar fuerza bruta
+  if (n <= 8) {
+    return bruteForceTSPOpen(matrix, start);
+  }
+  
+  // Para problemas más grandes, probar múltiples heurísticas
+  const candidates: number[][] = [];
+  
+  // 1. Nearest Neighbor (sin regreso)
+  candidates.push(nearestNeighborOpen(matrix, start));
+  
+  // 2. Nearest Neighbor desde diferentes puntos de inicio
+  for (let i = 1; i < Math.min(n, 5); i++) {
+    candidates.push(nearestNeighborOpen(matrix, i));
+  }
+  
+  // 3. Algoritmo de inserción
+  candidates.push(insertionHeuristicOpen(matrix, start));
+  
+  // 4. Algoritmo genético (para problemas medianos)
+  if (n <= 15) {
+    candidates.push(geneticAlgorithmOpen(matrix, start, 30, 100));
+  }
+  
+  // Elegir la mejor solución entre todos los candidatos
+  let bestOrder = candidates[0];
+  let bestCost = routeCostOpen(bestOrder, matrix);
+  
+  for (let i = 1; i < candidates.length; i++) {
+    const cost = routeCostOpen(candidates[i], matrix);
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestOrder = candidates[i];
+    }
+  }
+  
+  return bestOrder;
 }
 
 export function solveTSP(matrix: number[][], start: number = 0): number[] {
@@ -365,4 +408,189 @@ export function buildMatrixHaversine(points: Point[]): number[][] {
   }
   
   return matrix;
+}
+
+// ===== FUNCIONES PARA TSP ABIERTO (sin regreso al inicio) =====
+
+// Costo de ruta sin regreso al inicio
+export function routeCostOpen(order: number[], matrix: number[][]): number {
+  let cost = 0;
+  for (let i = 0; i < order.length - 1; i++) {
+    cost += matrix[order[i]][order[i + 1]];
+  }
+  return cost;
+}
+
+// Fuerza bruta para TSP abierto
+export function bruteForceTSPOpen(matrix: number[][], start: number = 0): number[] {
+  const n = matrix.length;
+  const nodes: number[] = [];
+  for (let i = 0; i < n; i++) if (i !== start) nodes.push(i);
+
+  let bestOrder: number[] | null = null;
+  let bestCost = Infinity;
+
+  function permute(arr: number[], l: number): void {
+    if (l === arr.length) {
+      const order = [start, ...arr];
+      const cost = routeCostOpen(order, matrix);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestOrder = order;
+      }
+    } else {
+      for (let i = l; i < arr.length; i++) {
+        [arr[l], arr[i]] = [arr[i], arr[l]];
+        permute(arr, l + 1);
+        [arr[l], arr[i]] = [arr[i], arr[l]];
+      }
+    }
+  }
+  
+  permute(nodes, 0);
+  return bestOrder || [start];
+}
+
+// Nearest Neighbor para TSP abierto
+export function nearestNeighborOpen(matrix: number[][], start: number = 0): number[] {
+  const n = matrix.length;
+  const visited = Array(n).fill(false);
+  const order = [start];
+  visited[start] = true;
+  
+  for (let k = 1; k < n; k++) {
+    const u = order[order.length - 1];
+    let best = -1;
+    let bestDistance = Infinity;
+    
+    for (let v = 0; v < n; v++) {
+      if (!visited[v] && matrix[u][v] < bestDistance) {
+        best = v;
+        bestDistance = matrix[u][v];
+      }
+    }
+    
+    visited[best] = true;
+    order.push(best);
+  }
+  
+  return order;
+}
+
+// Algoritmo de inserción para TSP abierto
+export function insertionHeuristicOpen(matrix: number[][], start: number = 0): number[] {
+  const n = matrix.length;
+  const order = [start];
+  
+  for (let i = 1; i < n; i++) {
+    let bestPosition = 0;
+    let bestCost = Infinity;
+    
+    // Probar insertar en cada posición
+    for (let pos = 0; pos <= order.length; pos++) {
+      const candidate = [...order.slice(0, pos), i, ...order.slice(pos)];
+      const cost = routeCostOpen(candidate, matrix);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestPosition = pos;
+      }
+    }
+    
+    order.splice(bestPosition, 0, i);
+  }
+  
+  return order;
+}
+
+// Algoritmo genético para TSP abierto
+export function geneticAlgorithmOpen(matrix: number[][], start: number, populationSize: number, generations: number): number[] {
+  const n = matrix.length;
+  let population: number[][] = [];
+  
+  // Inicializar población
+  for (let i = 0; i < populationSize; i++) {
+    const tour = [start];
+    const remaining = Array.from({length: n}, (_, i) => i).filter(x => x !== start);
+    
+    // Shuffle remaining nodes
+    for (let j = remaining.length - 1; j > 0; j--) {
+      const k = Math.floor(Math.random() * (j + 1));
+      [remaining[j], remaining[k]] = [remaining[k], remaining[j]];
+    }
+    
+    tour.push(...remaining);
+    population.push(tour);
+  }
+  
+  // Evolución
+  for (let gen = 0; gen < generations; gen++) {
+    // Evaluar fitness
+    population.sort((a, b) => routeCostOpen(a, matrix) - routeCostOpen(b, matrix));
+    
+    // Seleccionar mejores
+    const elite = population.slice(0, Math.floor(populationSize * 0.2));
+    const newPopulation = [...elite];
+    
+    // Cruzamiento
+    while (newPopulation.length < populationSize) {
+      const parent1 = population[Math.floor(Math.random() * populationSize)];
+      const parent2 = population[Math.floor(Math.random() * populationSize)];
+      const child = crossoverOpen(parent1, parent2);
+      
+      // Mutación
+      if (Math.random() < 0.1) {
+        mutateOpen(child);
+      }
+      
+      newPopulation.push(child);
+    }
+    
+    population = newPopulation;
+  }
+  
+  // Retornar mejor solución
+  population.sort((a, b) => routeCostOpen(a, matrix) - routeCostOpen(b, matrix));
+  return population[0];
+}
+
+// Cruzamiento para TSP abierto
+function crossoverOpen(parent1: number[], parent2: number[]): number[] {
+  const n = parent1.length;
+  const child = Array(n).fill(-1);
+  
+  // Copiar primer elemento (start)
+  child[0] = parent1[0];
+  
+  // Cruzamiento de orden
+  const start = Math.floor(Math.random() * (n - 1)) + 1;
+  const end = Math.floor(Math.random() * (n - 1)) + 1;
+  
+  const [startPos, endPos] = start < end ? [start, end] : [end, start];
+  
+  // Copiar segmento del primer padre
+  for (let i = startPos; i <= endPos; i++) {
+    child[i] = parent1[i];
+  }
+  
+  // Llenar el resto con elementos del segundo padre en orden
+  let parent2Index = 1;
+  for (let i = 1; i < n; i++) {
+    if (child[i] === -1) {
+      while (child.includes(parent2[parent2Index])) {
+        parent2Index++;
+      }
+      child[i] = parent2[parent2Index];
+      parent2Index++;
+    }
+  }
+  
+  return child;
+}
+
+// Mutación para TSP abierto
+function mutateOpen(tour: number[]): void {
+  // Swap mutation
+  const i = 1 + Math.floor(Math.random() * (tour.length - 2));
+  const j = 1 + Math.floor(Math.random() * (tour.length - 2));
+  [tour[i], tour[j]] = [tour[j], tour[i]];
 }
