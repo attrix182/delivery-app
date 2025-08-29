@@ -113,7 +113,7 @@ export default function DeliveryOptimizer() {
             {/* Resultados */}
             {result && (
               <RouteResults 
-                result={result} 
+                result={result || undefined} 
                 onReorder={(newOrder: number[]) => {
                   // Crear un nuevo resultado con el orden actualizado
                   const updatedResult = {
@@ -157,7 +157,7 @@ export default function DeliveryOptimizer() {
         isLoading={isLoading}
         returnToDepot={returnToDepot}
         status={status}
-        result={result}
+        result={result || undefined}
         onDepotChange={setDepot}
         onStopsChange={setStops}
         onReturnToDepotChange={setReturnToDepot}

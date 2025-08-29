@@ -2,6 +2,17 @@ import { useEffect, useState, useRef } from 'react';
 import RouteForm from './RouteForm';
 import RouteResults from './RouteResults';
 
+interface OptimizationResult {
+  order: number[];
+  points: Array<{
+    lat: number;
+    lng: number;
+    label?: string;
+  }>;
+  matrix: number[][];
+  hasDepot: boolean;
+}
+
 interface BottomSheetModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -10,14 +21,14 @@ interface BottomSheetModalProps {
   isLoading: boolean;
   returnToDepot: boolean;
   status?: string;
-  result?: any;
+  result?: OptimizationResult;
   onDepotChange: (value: string) => void;
   onStopsChange: (value: string) => void;
   onReturnToDepotChange: (value: boolean) => void;
   onOptimize: () => void;
   onReorder: (newOrder: number[]) => void;
-  renderOnMap: (result: any) => void;
-  setResult: (result: any) => void;
+  renderOnMap: (result: OptimizationResult) => void;
+  setResult: (result: OptimizationResult) => void;
 }
 
 export default function BottomSheetModal({
@@ -33,7 +44,6 @@ export default function BottomSheetModal({
   onStopsChange,
   onReturnToDepotChange,
   onOptimize,
-  onReorder,
   renderOnMap,
   setResult
 }: BottomSheetModalProps) {
@@ -42,10 +52,9 @@ export default function BottomSheetModal({
   const [startY, setStartY] = useState(0);
   const [startHeight, setStartHeight] = useState(0);
   const modalRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
   const currentHeightRef = useRef(400);
   const MIN_HEIGHT = 150; // Altura mínima antes de cerrar
-  const CLOSE_THRESHOLD = 50; // Distancia para cerrar (más pequeña)
 
   // Prevenir scroll del body cuando el modal está abierto
   useEffect(() => {
@@ -67,7 +76,7 @@ export default function BottomSheetModal({
       if (modalRef.current) {
         modalRef.current.style.height = `${newHeight}px`;
       }
-      if (animationFrameRef.current) {
+      if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
       animationFrameRef.current = requestAnimationFrame(() => {
@@ -133,7 +142,7 @@ export default function BottomSheetModal({
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
-      if (animationFrameRef.current) {
+      if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
