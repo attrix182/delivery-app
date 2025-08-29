@@ -20,45 +20,80 @@ export function useRouteOptimization() {
 
   const clearMap = () => {
     // Limpiar marcadores
-    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current.forEach(marker => {
+      try {
+        if (marker && typeof marker.setMap === 'function') {
+          marker.setMap(null);
+        }
+      } catch (error) {
+        console.warn('Error removing marker:', error);
+      }
+    });
     markersRef.current = [];
 
-    // Limpiar direcciones
-    if (directionsRendererRef.current) {
-      directionsRendererRef.current.setDirections(null);
-    }
+    // Simplemente limpiar la referencia del directions renderer
+    // Se reinicializará automáticamente cuando sea necesario
+    directionsRendererRef.current = null;
 
     // Resetear bounds
-    if (mapInstanceRef.current) {
-      const bounds = new google.maps.LatLngBounds();
-      mapInstanceRef.current.fitBounds(bounds);
+    if (mapInstanceRef.current && typeof mapInstanceRef.current.fitBounds === 'function') {
+      try {
+        const bounds = new google.maps.LatLngBounds();
+        mapInstanceRef.current.fitBounds(bounds);
+      } catch (error) {
+        console.warn('Error resetting bounds:', error);
+      }
     }
   };
 
   const renderOnMap = (optimizationResult: OptimizationResult) => {
-    if (!mapInstanceRef.current || !directionsRendererRef.current) return;
+    if (!mapInstanceRef.current) {
+      console.warn('Map not available');
+      return;
+    }
+
+    // Asegurar que el directions renderer esté disponible
+    const directionsRenderer = ensureDirectionsRenderer();
+    if (!directionsRenderer) {
+      console.warn('Could not initialize directions renderer');
+      return;
+    }
 
     const { order, points, matrix } = optimizationResult;
     const bounds = new google.maps.LatLngBounds();
 
     // Limpiar marcadores anteriores
-    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current.forEach(marker => {
+      try {
+        marker.setMap(null);
+      } catch (error) {
+        console.warn('Error removing marker:', error);
+      }
+    });
     markersRef.current = [];
 
     // Crear marcadores
     order.forEach((pointIndex, k) => {
-      const point = points[pointIndex];
-      const marker = new google.maps.Marker({
-        position: { lat: point.lat, lng: point.lng },
-        label: (k + 1).toString(),
-        map: mapInstanceRef.current
-      });
-      
-      markersRef.current.push(marker);
-      bounds.extend(marker.getPosition()!);
+      try {
+        const point = points[pointIndex];
+        const marker = new google.maps.Marker({
+          position: { lat: point.lat, lng: point.lng },
+          label: (k + 1).toString(),
+          map: mapInstanceRef.current
+        });
+        
+        markersRef.current.push(marker);
+        bounds.extend(marker.getPosition()!);
+      } catch (error) {
+        console.warn('Error creating marker:', error);
+      }
     });
 
-    mapInstanceRef.current.fitBounds(bounds);
+    try {
+      mapInstanceRef.current.fitBounds(bounds);
+    } catch (error) {
+      console.warn('Error fitting bounds:', error);
+    }
 
     // Solo dibujar ruta si hay más de un punto
     if (order.length > 1) {
@@ -72,7 +107,7 @@ export function useRouteOptimization() {
       try {
         drawDirectionsInBatches(
           new google.maps.DirectionsService(),
-          directionsRendererRef.current,
+          directionsRenderer,
           origin,
           destination,
           waypoints
@@ -151,8 +186,49 @@ export function useRouteOptimization() {
   };
 
   const setMapInstances = (map: google.maps.Map, directionsRenderer: google.maps.DirectionsRenderer) => {
-    mapInstanceRef.current = map;
-    directionsRendererRef.current = directionsRenderer;
+    if (map && typeof map.fitBounds === 'function') {
+      mapInstanceRef.current = map;
+    } else {
+      console.warn('Invalid map instance provided');
+    }
+    
+    if (directionsRenderer && typeof directionsRenderer.setDirections === 'function') {
+      directionsRendererRef.current = directionsRenderer;
+    } else {
+      console.warn('Invalid directions renderer provided');
+    }
+  };
+
+  const ensureDirectionsRenderer = () => {
+    // Verificar si necesitamos crear un nuevo renderer
+    if (!directionsRendererRef.current || 
+        typeof directionsRendererRef.current !== 'object' ||
+        typeof directionsRendererRef.current.setDirections !== 'function') {
+      
+      if (mapInstanceRef.current && window.google && window.google.maps) {
+        try {
+          // Limpiar cualquier renderer anterior
+          if (directionsRendererRef.current && typeof directionsRendererRef.current.setMap === 'function') {
+            directionsRendererRef.current.setMap(null);
+          }
+          
+          // Crear nuevo renderer
+          directionsRendererRef.current = new google.maps.DirectionsRenderer({
+            suppressMarkers: true,
+          });
+          directionsRendererRef.current.setMap(mapInstanceRef.current);
+          console.log('Directions renderer reinitialized successfully');
+        } catch (error) {
+          console.error('Error reinitializing directions renderer:', error);
+          directionsRendererRef.current = null;
+        }
+      } else {
+        console.warn('Map instance or Google Maps not available for directions renderer');
+        directionsRendererRef.current = null;
+      }
+    }
+    
+    return directionsRendererRef.current;
   };
 
   return {
@@ -161,5 +237,8 @@ export function useRouteOptimization() {
     isLoading,
     optimize,
     setMapInstances,
+    setResult,
+    renderOnMap,
+    ensureDirectionsRenderer,
   };
 }

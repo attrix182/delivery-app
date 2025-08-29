@@ -14,7 +14,7 @@ export default function DeliveryOptimizer() {
   const [stops, setStops] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
-  const { status, result, isLoading, optimize, setMapInstances } = useRouteOptimization();
+  const { status, result, isLoading, optimize, setMapInstances, setResult, renderOnMap } = useRouteOptimization();
 
   const handleOptimize = () => {
     optimize(depot, stops);
@@ -73,7 +73,21 @@ export default function DeliveryOptimizer() {
             )}
 
             {/* Resultados */}
-            {result && <RouteResults result={result} />}
+            {result && (
+              <RouteResults 
+                result={result} 
+                onReorder={(newOrder) => {
+                  // Crear un nuevo resultado con el orden actualizado
+                  const updatedResult = {
+                    ...result,
+                    order: newOrder
+                  };
+                  // Actualizar el estado local y re-renderizar en el mapa
+                  setResult(updatedResult);
+                  renderOnMap(updatedResult);
+                }}
+              />
+            )}
 
             {/* Panel informativo */}
             <InfoPanel />
