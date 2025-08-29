@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Header from './Header';
 import MapView from './MapView';
 import ResizableSidebar from './ResizableSidebar';
+import BottomSheetModal from './BottomSheetModal';
 import RouteForm from './RouteForm';
 import RouteResults from './RouteResults';
 
@@ -14,6 +15,8 @@ export default function DeliveryOptimizer() {
   const [stops, setStops] = useState('');
   const [returnToDepot, setReturnToDepot] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
   
   const { status, result, isLoading, optimize, setMapInstances, setResult, renderOnMap } = useRouteOptimization();
 
@@ -26,22 +29,54 @@ export default function DeliveryOptimizer() {
   };
 
   const handleToggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+    if (isSmallScreen) {
+      setIsModalOpen(!isModalOpen);
+    } else {
+      setIsSidebarOpen(!isSidebarOpen);
+    }
   };
+
+  // Hook para detectar el tamaño de la pantalla
+  useEffect(() => {
+    const handleResize = () => {
+      const isSmall = window.innerWidth < 480;
+      setIsSmallScreen(isSmall);
+      if (isSmall) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+        setIsModalOpen(false);
+      }
+    };
+
+    // Ejecutar al montar el componente
+    handleResize();
+
+    // Escuchar cambios de tamaño
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Escuchar eventos de toggle del sidebar desde el mapa
   useEffect(() => {
-    const handleToggleEvent = () => setIsSidebarOpen(true);
+    const handleToggleEvent = () => {
+      if (isSmallScreen) {
+        setIsModalOpen(true);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
     window.addEventListener('toggleSidebar', handleToggleEvent);
     return () => window.removeEventListener('toggleSidebar', handleToggleEvent);
-  }, []);
+  }, [isSmallScreen]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
       <Header 
         isSidebarOpen={isSidebarOpen} 
-        onToggleSidebar={handleToggleSidebar} 
+        onToggleSidebar={handleToggleSidebar}
+        isSmallScreen={isSmallScreen}
       />
 
       {/* Main Content */}
@@ -79,7 +114,7 @@ export default function DeliveryOptimizer() {
             {result && (
               <RouteResults 
                 result={result} 
-                onReorder={(newOrder) => {
+                onReorder={(newOrder: number[]) => {
                   // Crear un nuevo resultado con el orden actualizado
                   const updatedResult = {
                     ...result,
@@ -99,7 +134,7 @@ export default function DeliveryOptimizer() {
         {/* Overlay para móvil */}
         {isSidebarOpen && (
           <div 
-            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-10"
+            className="lg:hidden fixed inset-0 bg-transparent z-10"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
@@ -107,9 +142,39 @@ export default function DeliveryOptimizer() {
         {/* Mapa */}
         <MapView 
           isSidebarOpen={isSidebarOpen} 
-          onMapReady={handleMapReady} 
+          onMapReady={handleMapReady}
+          isSmallScreen={isSmallScreen}
+          isModalOpen={isModalOpen}
         />
       </div>
+
+      {/* Bottom Sheet Modal para pantallas pequeñas */}
+      <BottomSheetModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        depot={depot}
+        stops={stops}
+        isLoading={isLoading}
+        returnToDepot={returnToDepot}
+        status={status}
+        result={result}
+        onDepotChange={setDepot}
+        onStopsChange={setStops}
+        onReturnToDepotChange={setReturnToDepot}
+        onOptimize={handleOptimize}
+        onReorder={(newOrder: number[]) => {
+          if (result) {
+            const updatedResult = {
+              ...result,
+              order: newOrder
+            };
+            setResult(updatedResult);
+            renderOnMap(updatedResult);
+          }
+        }}
+        renderOnMap={renderOnMap}
+        setResult={setResult}
+      />
     </div>
   );
 }

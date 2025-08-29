@@ -4,9 +4,11 @@ import { config } from '@/config/env';
 interface MapViewProps {
   isSidebarOpen: boolean;
   onMapReady: (map: google.maps.Map, directionsRenderer: google.maps.DirectionsRenderer) => void;
+  isSmallScreen?: boolean;
+  isModalOpen?: boolean;
 }
 
-export default function MapView({ isSidebarOpen, onMapReady }: MapViewProps) {
+export default function MapView({ isSidebarOpen, onMapReady, isSmallScreen = false, isModalOpen = false }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,14 +76,14 @@ export default function MapView({ isSidebarOpen, onMapReady }: MapViewProps) {
         className="w-full h-full"
       />
       
-      {/* Botón flotante para abrir sidebar en móvil */}
-      {!isSidebarOpen && (
+      {/* Botón flotante para abrir sidebar/modal en móvil */}
+      {isSmallScreen && !isSidebarOpen && !isModalOpen && (
         <button
           onClick={() => window.dispatchEvent(new CustomEvent('toggleSidebar'))}
-          className="lg:hidden absolute top-4 left-4 z-30 bg-white p-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow"
+          className="absolute top-4 left-4 z-30 bg-white p-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow"
         >
           <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </button>
       )}

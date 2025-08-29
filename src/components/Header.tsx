@@ -1,9 +1,10 @@
 interface HeaderProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  isSmallScreen?: boolean;
 }
 
-export default function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) {
+export default function Header({ isSidebarOpen, onToggleSidebar, isSmallScreen = false }: HeaderProps) {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 z-10">
       <div className="flex items-center justify-between px-4 py-3">
@@ -16,14 +17,16 @@ export default function Header({ isSidebarOpen, onToggleSidebar }: HeaderProps) 
           <h1 className="text-xl font-semibold text-gray-900">Optimizador de Entregas</h1>
         </div>
         
-        <button
-          onClick={onToggleSidebar}
-          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+        {!isSmallScreen && (
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -28,6 +28,31 @@ body {
 
 /* Prevenir selección de texto durante el redimensionamiento */
 body.resizing {
-  cursor: col-resize;
+  cursor: ns-resize;
   user-select: none;
+}
+
+/* Estilos para el modal sheet redimensionable */
+.modal-resize-handle {
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.modal-resize-handle:hover {
+  background-color: transparent;
+}
+
+.modal-resize-handle .resize-thumb {
+  transition: background-color 0.2s ease;
+}
+
+.modal-resize-handle:hover .resize-thumb {
+  background-color: #6b7280;
+}
+
+/* Mejorar la experiencia de arrastre en móvil */
+@media (pointer: coarse) {
+  .modal-resize-handle {
+    min-height: 44px; /* Tamaño mínimo para touch */
+  }
 }
