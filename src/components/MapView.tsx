@@ -73,7 +73,7 @@ export default function MapView({ isSidebarOpen, onMapReady, isSmallScreen = fal
     <div className="flex-1 relative">
       <div 
         ref={mapRef} 
-        className="w-full h-full"
+        className="w-full h-[calc(100dvh-4rem)"
       />
       
       {/* Botón flotante para abrir sidebar/modal en móvil */}
